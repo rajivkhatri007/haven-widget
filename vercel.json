@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "embed.js", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "src": "/embed.js", "dest": "/embed.js" }
+  ]
+}

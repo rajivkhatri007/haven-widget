@@ -45,6 +45,7 @@
 
   // ── Toggle ────────────────────────────────────────────────────────────────
   var isOpen = false;
+  setTimeout(function() { btn.click(); }, 2000);
   btn.addEventListener('click', function () {
     if (!isOpen) {
       panel.classList.add('open');

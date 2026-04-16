@@ -8,7 +8,7 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: sans-serif; background: #f9f7f3; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
-  .header { background: #0f1a12; padding: 14px 16px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .header { background: #0f1a12; padding: 14px 16px; padding-top: max(14px, env(safe-area-inset-top)); display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
   .icon { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #4a7c59, #2d5a3d); display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
   .hname { color: white; font-weight: 700; font-size: 15px; }
   .hsub { color: #6b8f71; font-size: 11px; margin-top: 1px; }
@@ -78,7 +78,7 @@
     <div class="hsub">Belvedere Baptist Church</div>
   </div>
   <div class="online-dot"></div>
-  <button onclick="window.parent.postMessage('haven-close','*')" style="background:rgba(255,255,255,0.08);border:none;border-radius:7px;padding:5px 9px;cursor:pointer;color:#6b8f71;font-size:16px;margin-left:8px;line-height:1">✕</button>
+  <button onclick="window.parent.postMessage('haven-close','*')" style="background:rgba(255,255,255,0.15);border:none;border-radius:8px;padding:7px 12px;cursor:pointer;color:white;font-size:18px;font-weight:700;margin-left:8px;line-height:1;flex-shrink:0">✕</button>
 </div>
 
 <div class="chips">

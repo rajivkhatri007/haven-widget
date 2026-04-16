@@ -62,4 +62,8 @@
       isOpen = false;
     }
   }
+  // Listen for close message from iframe
+  window.addEventListener("message", function(e) {
+    if (e.data === "haven-close" && isOpen) toggle();
+  });
 })();

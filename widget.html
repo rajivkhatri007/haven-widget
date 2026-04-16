@@ -291,7 +291,7 @@ async function sendMsg() {
 
   } catch (e) {
     hideTyping();
-    appendMsg("ai", "Error: " + e.message, Date.now());
+    appendMsg("ai", "I'm having trouble connecting right now. Please try again in a moment.", Date.now());
   }
 
   loading = false;

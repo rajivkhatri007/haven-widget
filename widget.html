@@ -107,6 +107,13 @@ What's on your heart?</div>
 
 <script>
 var CHURCH_NAME = "Belvedere Baptist Church";
+var PASTOR_NAME = "Pastor Rajiv";
+var SCHOLARS = "Tim Keller, John Piper, RC Sproul, CS Lewis, Ed Welch, Paul Tripp, Martyn Lloyd-Jones, DA Carson";
+var BOOKS = "Walking with God through Pain and Suffering (Keller), The Holiness of God (Sproul), Mere Christianity (Lewis)";
+var DISTINCTIVES = "Reformed Baptist, elder-led, covenantal, regenerate church membership";
+var TONE_NOTES = "Compassion first, truth second. Warm, grounded, pastoral.";
+var RESPONSE_LENGTH = "3-5 sentences";
+var HANDOFF_TRIGGER = 2;
 var PROXY = "https://haven-widget.vercel.app/api";
 
 // Default chips — can be overridden by saved settings
@@ -149,7 +156,58 @@ function renderChips() {
   });
 }
 
-renderChips();
+// Load settings from Supabase then render
+async function loadRemoteSettings() {
+  try {
+    var res = await fetch("https://haven-widget.vercel.app/api/settings?church=" + encodeURIComponent(CHURCH_NAME));
+    var data = await res.json();
+    if (data && data.chips && data.chips.length > 0) {
+      DEFAULT_CHIPS = data.chips;
+    }
+    if (data && data.accentColor) {
+      var ac = data.accentColor;
+      // Update all color references dynamically
+      document.documentElement.style.setProperty("--ac", ac);
+      document.querySelectorAll(".icon,.avatar.ai").forEach(function(el){
+        el.style.background = "linear-gradient(135deg," + ac + "," + ac + "cc)";
+      });
+      document.querySelectorAll(".chip").forEach(function(el){
+        el.style.color = ac;
+        el.style.background = ac + "18";
+        el.style.borderColor = ac + "44";
+      });
+      document.querySelectorAll(".send-btn,.cta-btn,.btn-submit").forEach(function(el){
+        el.style.background = ac;
+      });
+      document.querySelectorAll(".topic-pill").forEach(function(el){
+        el.style.color = ac;
+        el.style.background = ac + "18";
+      });
+    }
+    if (data && data.widgetName) {
+      document.querySelector(".hname").textContent = data.widgetName;
+    }
+    if (data && data.churchName) {
+      document.querySelector(".hsub").textContent = data.churchName;
+    }
+    if (data && data.welcomeMessage) {
+      var firstBubble = document.querySelector(".bubble.ai");
+      if (firstBubble) firstBubble.textContent = data.welcomeMessage;
+    }
+    if (data && data.pastorName) {
+      PASTOR_NAME = data.pastorName;
+    }
+    if (data && data.scholars) SCHOLARS = data.scholars;
+    if (data && data.books) BOOKS = data.books;
+    if (data && data.distinctives) DISTINCTIVES = data.distinctives;
+    if (data && data.toneNotes) TONE_NOTES = data.toneNotes;
+    if (data && data.responseLength) RESPONSE_LENGTH = data.responseLength;
+    if (data && data.handoffTrigger) HANDOFF_TRIGGER = parseInt(data.handoffTrigger) || 2;
+  } catch(e) { console.log("Using default widget settings"); }
+  renderChips();
+}
+
+loadRemoteSettings();
 
 var SYSTEM = "You are Haven, a warm, theologically grounded pastoral AI assistant embedded on the website of Belvedere Baptist Church in West Palm Beach, Florida. Your role is to engage visitors and seekers with compassion, truth, and a gentle invitation into the local church community.\n\nCHURCH CONTEXT:\n- Church: Belvedere Baptist Church\n- Pastor: Pastor Rajiv\n- Tradition: Reformed Baptist, elder-led, covenantal\n- Draw on: Tim Keller (suffering, meaning, doubt), John Piper (sovereignty of God), RC Sproul (apologetics), CS Lewis (doubt, grief), Ed Welch and Paul Tripp (soul care, depression), Martyn Lloyd-Jones (spiritual depression), DA Carson (theodicy)\n\nTONE:\n- Compassion first, truth second\n- Warm, grounded, pastoral — masculine but safe for everyone\n- Seeker-friendly — assume no church background\n- 3-5 sentences per response, concise and warm\n\nHARD QUESTIONS:\n- Suffering: Acknowledge real pain first. God entered suffering in Christ.\n- Depression: Validate it. Not a faith failure. Affirm both spiritual and practical care.\n- Doubt: Not the opposite of faith. Engage seriously.\n- Salvation: Grace alone, faith alone, Christ alone.\n\nCRISIS: If someone mentions suicidal thoughts or self-harm, respond with deep care and immediately provide the 988 Suicide and Crisis Lifeline.\n\nCHURCH CONNECTION: After 2-3 meaningful exchanges, gently invite the person to connect with Pastor Rajiv at Belvedere Baptist Church. You are a first conversation, not a replacement for community.";
 
@@ -362,7 +420,7 @@ async function sendMsg() {
     aiCount++;
     // Log full transcript after every AI response
     logConversation();
-    if (aiCount === 2 && leadStage === "hidden") showCTA();
+    if (aiCount === HANDOFF_TRIGGER && leadStage === "hidden") showCTA();
   } catch (e) {
     hideTyping();
     appendMsg("ai", "I'm having trouble connecting right now. Please try again in a moment.", Date.now());

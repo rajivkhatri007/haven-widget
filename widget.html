@@ -13,6 +13,7 @@
   .hname { color: white; font-weight: 700; font-size: 15px; }
   .hsub { color: #6b8f71; font-size: 11px; margin-top: 1px; }
   .online-dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; margin-left: auto; flex-shrink: 0; }
+  .close-btn { background: rgba(255,255,255,0.15); border: none; border-radius: 8px; padding: 7px 12px; cursor: pointer; color: white; font-size: 18px; font-weight: 700; margin-left: 8px; line-height: 1; flex-shrink: 0; }
 
   .chips { padding: 9px 13px 7px; display: flex; flex-wrap: wrap; gap: 5px; border-bottom: 1px solid rgba(74,124,89,0.1); background: rgba(240,244,241,0.7); flex-shrink: 0; }
   .chip-label { width: 100%; font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: #9db8a4; }
@@ -28,7 +29,6 @@
   .avatar { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; color: white; }
   .avatar.ai { background: linear-gradient(135deg, #4a7c59, #2d5a3d); }
   .avatar.user { background: #2d3a30; }
-
   .bubble { max-width: 79%; padding: 9px 13px; font-size: 13px; line-height: 1.68; white-space: pre-wrap; }
   .bubble.ai { background: white; color: #1a1a1a; border-radius: 14px 14px 14px 4px; border: 1px solid rgba(74,124,89,0.12); box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
   .bubble.user { background: #2d3a30; color: white; border-radius: 14px 14px 4px 14px; }
@@ -78,15 +78,11 @@
     <div class="hsub">Belvedere Baptist Church</div>
   </div>
   <div class="online-dot"></div>
-  <button onclick="window.parent.postMessage('haven-close','*')" style="background:rgba(255,255,255,0.15);border:none;border-radius:8px;padding:7px 12px;cursor:pointer;color:white;font-size:18px;font-weight:700;margin-left:8px;line-height:1;flex-shrink:0">✕</button>
+  <button class="close-btn" onclick="window.parent.postMessage('haven-close','*')">✕</button>
 </div>
 
-<div class="chips">
+<div class="chips" id="chips-container">
   <div class="chip-label">People are asking</div>
-  <div class="chip" onclick="sendChip(this)">Why does God allow suffering?</div>
-  <div class="chip" onclick="sendChip(this)">I struggle with depression</div>
-  <div class="chip" onclick="sendChip(this)">How do I know God is real?</div>
-  <div class="chip" onclick="sendChip(this)">What is the gospel?</div>
 </div>
 
 <div class="messages" id="msgs">
@@ -113,6 +109,48 @@ What's on your heart?</div>
 var CHURCH_NAME = "Belvedere Baptist Church";
 var PROXY = "https://haven-widget.vercel.app/api";
 
+// Default chips — can be overridden by saved settings
+var DEFAULT_CHIPS = [
+  "Why does God allow suffering?",
+  "I struggle with depression",
+  "How do I know God is real?",
+  "What is the gospel?",
+  "Can God forgive what I've done?",
+  "I feel lost and don't know why",
+  "What happens when we die?",
+  "How do I find peace?"
+];
+
+// Load chips from settings stored in localStorage (set by dashboard)
+function loadChips() {
+  try {
+    var saved = localStorage.getItem("haven:settings");
+    if (saved) {
+      var s = JSON.parse(saved);
+      if (s.chips && s.chips.length > 0) return s.chips;
+    }
+  } catch(e) {}
+  return DEFAULT_CHIPS;
+}
+
+function renderChips() {
+  var container = document.getElementById("chips-container");
+  var chips = loadChips();
+  // Clear existing chips (keep label)
+  var label = container.querySelector(".chip-label");
+  container.innerHTML = "";
+  container.appendChild(label);
+  chips.forEach(function(chip) {
+    var div = document.createElement("div");
+    div.className = "chip";
+    div.textContent = chip;
+    div.onclick = function() { sendChip(div); };
+    container.appendChild(div);
+  });
+}
+
+renderChips();
+
 var SYSTEM = "You are Haven, a warm, theologically grounded pastoral AI assistant embedded on the website of Belvedere Baptist Church in West Palm Beach, Florida. Your role is to engage visitors and seekers with compassion, truth, and a gentle invitation into the local church community.\n\nCHURCH CONTEXT:\n- Church: Belvedere Baptist Church\n- Pastor: Pastor Rajiv\n- Tradition: Reformed Baptist, elder-led, covenantal\n- Draw on: Tim Keller (suffering, meaning, doubt), John Piper (sovereignty of God), RC Sproul (apologetics), CS Lewis (doubt, grief), Ed Welch and Paul Tripp (soul care, depression), Martyn Lloyd-Jones (spiritual depression), DA Carson (theodicy)\n\nTONE:\n- Compassion first, truth second\n- Warm, grounded, pastoral — masculine but safe for everyone\n- Seeker-friendly — assume no church background\n- 3-5 sentences per response, concise and warm\n\nHARD QUESTIONS:\n- Suffering: Acknowledge real pain first. God entered suffering in Christ.\n- Depression: Validate it. Not a faith failure. Affirm both spiritual and practical care.\n- Doubt: Not the opposite of faith. Engage seriously.\n- Salvation: Grace alone, faith alone, Christ alone.\n\nCRISIS: If someone mentions suicidal thoughts or self-harm, respond with deep care and immediately provide the 988 Suicide and Crisis Lifeline.\n\nCHURCH CONNECTION: After 2-3 meaningful exchanges, gently invite the person to connect with Pastor Rajiv at Belvedere Baptist Church. You are a first conversation, not a replacement for community.";
 
 var TOPIC_TAGS = ["suffering","depression","anxiety","doubt","salvation","gospel","prayer","marriage","addiction","grief","purpose","anger","forgiveness","loneliness","death","faith","sin","hope","healing","fear"];
@@ -126,22 +164,30 @@ var sessionId = "session_" + Date.now() + "_" + Math.random().toString(36).subst
 var conversationLogged = false;
 
 // ── Logging ───────────────────────────────────────────────────────────────
+function buildTranscript() {
+  return chatHistory.map(function(m) {
+    return { role: m.role, content: m.content, ts: m.ts || null };
+  });
+}
+
 async function logConversation() {
-  if (conversationLogged) return;
-  conversationLogged = true;
+  if (chatHistory.length === 0) return;
   try {
+    var type = conversationLogged ? "update" : "conversation";
+    conversationLogged = true;
     await fetch(PROXY + "/log", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        type: "conversation",
+        type: type,
         church_name: CHURCH_NAME,
         topics: sessionTopics,
         message_count: chatHistory.length,
-        session_id: sessionId
+        session_id: sessionId,
+        messages: buildTranscript()
       })
     });
-  } catch(e) { /* silent */ }
+  } catch(e) {}
 }
 
 async function logLead(name, email, topic) {
@@ -149,19 +195,13 @@ async function logLead(name, email, topic) {
     await fetch(PROXY + "/log", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type: "lead",
-        church_name: CHURCH_NAME,
-        name: name,
-        email: email,
-        topic: topic,
-        session_id: sessionId
-      })
+      body: JSON.stringify({ type: "lead", church_name: CHURCH_NAME, name: name, email: email, topic: topic, session_id: sessionId })
     });
-  } catch(e) { /* silent */ }
+    // Also update conversation with latest transcript
+    await logConversation();
+  } catch(e) {}
 }
 
-// Log conversation when user leaves or after first exchange
 window.addEventListener("beforeunload", function() {
   if (chatHistory.length > 0) logConversation();
 });
@@ -196,7 +236,7 @@ function detectTopics(text) {
 function updateTopics(newTopics) {
   newTopics.forEach(function(t) { if (!sessionTopics.includes(t)) sessionTopics.push(t); });
   var el = document.getElementById("topics");
-  el.innerHTML = sessionTopics.slice(0, 5).map(function(t) {
+  el.innerHTML = sessionTopics.slice(0, 6).map(function(t) {
     return '<div class="topic-pill">' + t + "</div>";
   }).join("");
 }
@@ -272,12 +312,7 @@ async function submitLead() {
   var f = document.getElementById("lead-form");
   if (f) f.remove();
   leadStage = "submitted";
-
-  // Log lead to Supabase
   await logLead(name, email, topic);
-  // Also log the full conversation now
-  logConversation();
-
   var msgs = document.getElementById("msgs");
   var div = document.createElement("div");
   div.className = "success-msg";
@@ -294,14 +329,13 @@ async function sendMsg() {
   var inp = document.getElementById("inp");
   var text = inp.value.trim();
   if (!text) return;
-
   inp.value = "";
   inp.style.height = "auto";
   document.getElementById("sendBtn").disabled = true;
   loading = true;
 
   var ts = Date.now();
-  chatHistory.push({ role: "user", content: text });
+  chatHistory.push({ role: "user", content: text, ts: ts });
   appendMsg("user", text, ts);
   updateTopics(detectTopics(text));
   showTyping();
@@ -314,24 +348,21 @@ async function sendMsg() {
         model: "claude-sonnet-4-5",
         max_tokens: 1024,
         system: SYSTEM,
-        messages: chatHistory
+        messages: chatHistory.map(function(m) { return { role: m.role, content: m.content }; })
       })
     });
-
     var data = await res.json();
     if (data.error) throw new Error(data.error.message || data.error);
     var reply = data.content[0].text;
-
-    chatHistory.push({ role: "assistant", content: reply });
+    var replyTs = Date.now();
+    chatHistory.push({ role: "assistant", content: reply, ts: replyTs });
     hideTyping();
-    appendMsg("ai", reply, Date.now());
+    appendMsg("ai", reply, replyTs);
     updateTopics(detectTopics(reply));
     aiCount++;
-
-    // Log conversation after first real exchange
-    if (aiCount === 1) logConversation();
+    // Log full transcript after every AI response
+    logConversation();
     if (aiCount === 2 && leadStage === "hidden") showCTA();
-
   } catch (e) {
     hideTyping();
     appendMsg("ai", "I'm having trouble connecting right now. Please try again in a moment.", Date.now());

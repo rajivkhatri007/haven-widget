@@ -16,7 +16,7 @@
 
   .chips { padding: 9px 13px 7px; display: flex; flex-wrap: wrap; gap: 5px; border-bottom: 1px solid rgba(74,124,89,0.1); background: rgba(240,244,241,0.7); flex-shrink: 0; }
   .chip-label { width: 100%; font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: #9db8a4; }
-  .chip { font-size: 11px; color: #4a7c59‎; background: rgba(74,124,89,0.09); border: 1px solid rgba(74,124,89,0.28); border-radius: 20px; padding: 3px 10px; cursor: pointer; }
+  .chip { font-size: 11px; color: #4a7c59; background: rgba(74,124,89,0.09); border: 1px solid rgba(74,124,89,0.28); border-radius: 20px; padding: 3px 10px; cursor: pointer; }
   .chip:hover { background: rgba(74,124,89,0.16); }
 
   .messages { flex: 1; overflow-y: auto; padding: 13px; display: flex; flex-direction: column; gap: 11px; }
@@ -49,12 +49,11 @@
   .lead-form p { font-size: 11.5px; color: #6b8f71; margin-bottom: 12px; line-height: 1.5; }
   .field { margin-bottom: 9px; }
   .field label { display: block; font-size: 10.5px; font-weight: 600; color: #4a5568; margin-bottom: 4px; letter-spacing: .05em; }
-  .field input, .field textarea { width: 100%; border: 1px solid #e2d9c8; border-radius: 8px; padding: 8px 10px; font-size: 12.5px; color: #1a1612; background: #faf8f4; outline: none; font-family: sans-serif; }
+  .field input, .field textarea { width: 100%; border: 1px solid #e2d9c8; border-radius: 8px; padding: 8px 10px; font-size: 12.5px; color: #1a1612; background: #faf8f4; outline: none; font-family: sans-serif; box-sizing: border-box; }
   .field textarea { resize: vertical; min-height: 52px; }
   .form-btns { display: flex; gap: 7px; margin-top: 4px; }
   .btn-cancel { flex: 1; background: #f0f0f0; color: #666; border: none; border-radius: 8px; padding: 8px; font-size: 12px; cursor: pointer; }
   .btn-submit { flex: 2; background: #4a7c59; color: white; border: none; border-radius: 8px; padding: 8px; font-size: 12px; cursor: pointer; font-weight: 600; }
-  .btn-submit:disabled { background: #c4d4c8; cursor: not-allowed; }
 
   .success-msg { background: rgba(74,124,89,0.1); border: 1px solid rgba(74,124,89,0.25); border-radius: 12px; padding: 13px; text-align: center; font-size: 12.5px; color: #2d3a30; line-height: 1.6; animation: fadeUp .25s ease; }
 
@@ -110,6 +109,9 @@ What's on your heart?</div>
 <div class="footer">Haven by <strong>Shepherd AI</strong> — safe space, real answers</div>
 
 <script>
+var CHURCH_NAME = "Belvedere Baptist Church";
+var PROXY = "https://haven-widget.vercel.app/api";
+
 var SYSTEM = "You are Haven, a warm, theologically grounded pastoral AI assistant embedded on the website of Belvedere Baptist Church in West Palm Beach, Florida. Your role is to engage visitors and seekers with compassion, truth, and a gentle invitation into the local church community.\n\nCHURCH CONTEXT:\n- Church: Belvedere Baptist Church\n- Pastor: Pastor Rajiv\n- Tradition: Reformed Baptist, elder-led, covenantal\n- Draw on: Tim Keller (suffering, meaning, doubt), John Piper (sovereignty of God), RC Sproul (apologetics), CS Lewis (doubt, grief), Ed Welch and Paul Tripp (soul care, depression), Martyn Lloyd-Jones (spiritual depression), DA Carson (theodicy)\n\nTONE:\n- Compassion first, truth second\n- Warm, grounded, pastoral — masculine but safe for everyone\n- Seeker-friendly — assume no church background\n- 3-5 sentences per response, concise and warm\n\nHARD QUESTIONS:\n- Suffering: Acknowledge real pain first. God entered suffering in Christ.\n- Depression: Validate it. Not a faith failure. Affirm both spiritual and practical care.\n- Doubt: Not the opposite of faith. Engage seriously.\n- Salvation: Grace alone, faith alone, Christ alone.\n\nCRISIS: If someone mentions suicidal thoughts or self-harm, respond with deep care and immediately provide the 988 Suicide and Crisis Lifeline.\n\nCHURCH CONNECTION: After 2-3 meaningful exchanges, gently invite the person to connect with Pastor Rajiv at Belvedere Baptist Church. You are a first conversation, not a replacement for community.";
 
 var TOPIC_TAGS = ["suffering","depression","anxiety","doubt","salvation","gospel","prayer","marriage","addiction","grief","purpose","anger","forgiveness","loneliness","death","faith","sin","hope","healing","fear"];
@@ -119,17 +121,58 @@ var loading = false;
 var aiCount = 0;
 var leadStage = "hidden";
 var sessionTopics = [];
+var sessionId = "session_" + Date.now() + "_" + Math.random().toString(36).substr(2,9);
+var conversationLogged = false;
 
+// ── Logging ───────────────────────────────────────────────────────────────
+async function logConversation() {
+  if (conversationLogged) return;
+  conversationLogged = true;
+  try {
+    await fetch(PROXY + "/log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "conversation",
+        church_name: CHURCH_NAME,
+        topics: sessionTopics,
+        message_count: chatHistory.length,
+        session_id: sessionId
+      })
+    });
+  } catch(e) { /* silent */ }
+}
+
+async function logLead(name, email, topic) {
+  try {
+    await fetch(PROXY + "/log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "lead",
+        church_name: CHURCH_NAME,
+        name: name,
+        email: email,
+        topic: topic,
+        session_id: sessionId
+      })
+    });
+  } catch(e) { /* silent */ }
+}
+
+// Log conversation when user leaves or after first exchange
+window.addEventListener("beforeunload", function() {
+  if (chatHistory.length > 0) logConversation();
+});
+
+// ── UI helpers ────────────────────────────────────────────────────────────
 function resizeInput(el) {
   el.style.height = "auto";
   el.style.height = Math.min(el.scrollHeight, 85) + "px";
 }
 
 function handleKey(e) {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    sendMsg();
-  }
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMsg(); }
 }
 
 function sendChip(el) {
@@ -138,8 +181,7 @@ function sendChip(el) {
 }
 
 function timeAgo(ts) {
-  var diff = Date.now() - ts;
-  var m = Math.floor(diff / 60000);
+  var diff = Date.now() - ts, m = Math.floor(diff / 60000);
   if (m < 1) return "just now";
   if (m < 60) return m + "m ago";
   return Math.floor(m / 60) + "h ago";
@@ -166,10 +208,8 @@ function appendMsg(role, text, ts) {
   var escaped = text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>");
   row.innerHTML =
     '<div class="avatar ' + (isUser ? "user" : "ai") + '">' + (isUser ? "👤" : "⚓") + "</div>" +
-    "<div>" +
-    '<div class="bubble ' + (isUser ? "user" : "ai") + '">' + escaped + "</div>" +
-    '<div class="ts" style="text-align:' + (isUser ? "right" : "left") + '">' + timeAgo(ts) + "</div>" +
-    "</div>";
+    "<div><div class=\"bubble " + (isUser ? "user" : "ai") + "\">" + escaped + "</div>" +
+    "<div class=\"ts\" style=\"text-align:" + (isUser ? "right" : "left") + "\">" + timeAgo(ts) + "</div></div>";
   msgs.appendChild(row);
   msgs.scrollTop = msgs.scrollHeight;
 }
@@ -177,8 +217,7 @@ function appendMsg(role, text, ts) {
 function showTyping() {
   var msgs = document.getElementById("msgs");
   var row = document.createElement("div");
-  row.className = "row";
-  row.id = "typing-row";
+  row.className = "row"; row.id = "typing-row";
   row.innerHTML = '<div class="avatar ai">⚓</div><div class="typing"><span></span><span></span><span></span></div>';
   msgs.appendChild(row);
   msgs.scrollTop = msgs.scrollHeight;
@@ -192,10 +231,8 @@ function hideTyping() {
 function showCTA() {
   var msgs = document.getElementById("msgs");
   var div = document.createElement("div");
-  div.id = "cta-card";
-  div.className = "cta-card";
-  div.innerHTML =
-    "<strong style='color:#4a7c59'>Want to keep talking?</strong> Pastor Rajiv at Belvedere Baptist Church would love to connect with you personally.<br>" +
+  div.id = "cta-card"; div.className = "cta-card";
+  div.innerHTML = "<strong style='color:#4a7c59'>Want to keep talking?</strong> Pastor Rajiv at Belvedere Baptist Church would love to connect with you personally.<br>" +
     '<button class="cta-btn" onclick="showLeadForm()">Connect with Pastor Rajiv →</button>';
   msgs.appendChild(div);
   msgs.scrollTop = msgs.scrollHeight;
@@ -207,18 +244,15 @@ function showLeadForm() {
   leadStage = "form";
   var msgs = document.getElementById("msgs");
   var div = document.createElement("div");
-  div.id = "lead-form";
-  div.className = "lead-form";
+  div.id = "lead-form"; div.className = "lead-form";
   div.innerHTML =
     "<h4>Let's connect you with Pastor Rajiv</h4>" +
     "<p>Leave your info and someone will reach out personally — no pressure, no spam.</p>" +
     '<div class="field"><label>Your name</label><input type="text" id="lname" placeholder="First name is fine"></div>' +
     '<div class="field"><label>Email address</label><input type="email" id="lemail" placeholder="you@email.com"></div>' +
     '<div class="field"><label>What would you like to talk about?</label><textarea id="ltopic" placeholder="Optional — anything on your heart"></textarea></div>' +
-    '<div class="form-btns">' +
-    '<button class="btn-cancel" onclick="cancelForm()">Cancel</button>' +
-    '<button class="btn-submit" onclick="submitLead()">Send my info →</button>' +
-    "</div>";
+    '<div class="form-btns"><button class="btn-cancel" onclick="cancelForm()">Cancel</button>' +
+    '<button class="btn-submit" onclick="submitLead()">Send my info →</button></div>';
   msgs.appendChild(div);
   msgs.scrollTop = msgs.scrollHeight;
 }
@@ -229,24 +263,31 @@ function cancelForm() {
   leadStage = "hidden";
 }
 
-function submitLead() {
+async function submitLead() {
   var name = document.getElementById("lname").value.trim();
   var email = document.getElementById("lemail").value.trim();
+  var topic = document.getElementById("ltopic") ? document.getElementById("ltopic").value.trim() : "";
   if (!name || !email) { alert("Please enter your name and email."); return; }
   var f = document.getElementById("lead-form");
   if (f) f.remove();
   leadStage = "submitted";
+
+  // Log lead to Supabase
+  await logLead(name, email, topic);
+  // Also log the full conversation now
+  logConversation();
+
   var msgs = document.getElementById("msgs");
   var div = document.createElement("div");
   div.className = "success-msg";
-  div.innerHTML =
-    '<div style="font-size:20px;margin-bottom:6px">✓</div>' +
+  div.innerHTML = '<div style="font-size:20px;margin-bottom:6px">✓</div>' +
     "<strong>You're all set, " + name + ".</strong><br>" +
     "Pastor Rajiv will reach out to <em>" + email + "</em> soon. Haven is still here if you want to keep talking.";
   msgs.appendChild(div);
   msgs.scrollTop = msgs.scrollHeight;
 }
 
+// ── Send message ──────────────────────────────────────────────────────────
 async function sendMsg() {
   if (loading) return;
   var inp = document.getElementById("inp");
@@ -265,11 +306,9 @@ async function sendMsg() {
   showTyping();
 
   try {
-    var res = await fetch("https://haven-widget.vercel.app/api/chat", {
+    var res = await fetch(PROXY + "/chat", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "claude-sonnet-4-5",
         max_tokens: 1024,
@@ -279,7 +318,7 @@ async function sendMsg() {
     });
 
     var data = await res.json();
-    if (data.error) throw new Error(data.error.message);
+    if (data.error) throw new Error(data.error.message || data.error);
     var reply = data.content[0].text;
 
     chatHistory.push({ role: "assistant", content: reply });
@@ -287,6 +326,9 @@ async function sendMsg() {
     appendMsg("ai", reply, Date.now());
     updateTopics(detectTopics(reply));
     aiCount++;
+
+    // Log conversation after first real exchange
+    if (aiCount === 1) logConversation();
     if (aiCount === 2 && leadStage === "hidden") showCTA();
 
   } catch (e) {

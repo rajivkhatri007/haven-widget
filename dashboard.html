@@ -692,3 +692,34 @@ window.saveSettings = saveSettings;
 </script>
 </body>
 </html>
+<script>
+// Real data loader — fetches from Supabase via Vercel proxy
+async function loadRealData() {
+  try {
+    var res = await fetch("https://haven-widget.vercel.app/api/data");
+    if (!res.ok) return;
+    var json = await res.json();
+    if (!json.conversations || json.conversations.length === 0) return;
+    sessions = json.conversations.map(function(c) {
+      var matchedLead = (json.leads || []).find(function(l) { return l.session_id === c.session_id; });
+      return {
+        ts: new Date(c.created_at).getTime(),
+        topics: c.topics || [],
+        messageCount: c.message_count || 0,
+        lead: matchedLead ? { name: matchedLead.name, email: matchedLead.email, topic: matchedLead.topic } : null
+      };
+    }).sort(function(a,b){ return b.ts - a.ts; });
+    // Re-render all tabs with real data
+    renderOverview();
+    renderLeads();
+    renderTopics();
+    renderConversations();
+  } catch(e) {
+    console.log("Using demo data:", e.message);
+  }
+}
+// Run real data load after page initializes
+window.addEventListener("DOMContentLoaded", function() {
+  setTimeout(loadRealData, 500);
+});
+</script>

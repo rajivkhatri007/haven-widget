@@ -18,7 +18,7 @@
     '#haven-panel.open{display:block}' +
     '#haven-panel.visible{opacity:1;transform:translateY(0)}' +
     '#haven-panel iframe{width:100%;height:100%;border:none}' +
-    '@media(max-width:480px){#haven-panel{bottom:0;right:0;width:100vw;height:100vh;border-radius:0}' +
+    '@media(max-width:480px){#haven-panel{bottom:0;right:0;width:100vw;height:100%;height:100dvh;border-radius:0;top:0}' +
     '#haven-launcher{bottom:20px;right:20px}}';
   document.head.appendChild(style);
 

@@ -45,7 +45,9 @@
   var isOpen = false;
 
   // Auto-open after 2 seconds
-  setTimeout(function () { if (!isOpen) toggle(); }, 2000);
+  // Auto-open after 8 seconds on desktop, 15 seconds on mobile
+  var isMobile = window.innerWidth < 600;
+  setTimeout(function () { if (!isOpen) toggle(); }, isMobile ? 15000 : 8000);
 
   btn.addEventListener('click', toggle);
 

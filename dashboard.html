@@ -676,13 +676,18 @@ function updateSaveBtn() {
   btn.textContent=hasChanges?"Save Changes":"No Changes";
 }
 
-function saveSettings() {
-  try { localStorage.setItem("haven:settings",JSON.stringify(settings)); } catch(e){}
-  savedSettings=JSON.parse(JSON.stringify(settings));
+async function saveSettings() {
   var btn=document.getElementById("save-btn");
-  btn.style.background="#27ae60";
-  btn.textContent="✓ Saved";
-  btn.disabled=true;
+  btn.textContent="Saving…";btn.disabled=true;
+  try { localStorage.setItem("haven:settings",JSON.stringify(settings)); } catch(e){}
+  try {
+    await fetch("https://haven-widget.vercel.app/api/settings",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({church_name:settings.churchName,data:settings})
+    });
+  } catch(e){console.log("Settings sync error:",e);}
+  savedSettings=JSON.parse(JSON.stringify(settings));
+  btn.style.background="#27ae60";btn.textContent="✓ Saved & Live";
   setTimeout(updateSaveBtn,2500);
   renderOverview();
 }

@@ -310,7 +310,7 @@ function appendMsg(role, text, ts) {
     "<div><div class=\"bubble " + (isUser ? "user" : "ai") + "\">" + escaped + "</div>" +
     "<div class=\"ts\" style=\"text-align:" + (isUser ? "right" : "left") + "\">" + timeAgo(ts) + "</div></div>";
   msgs.appendChild(row);
-  msgs.scrollTop = msgs.scrollHeight;
+  msgs.scrollTop = row.offsetTop - 10;
 }
 
 function showTyping() {
